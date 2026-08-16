@@ -306,11 +306,11 @@ def auto_detect_dependencies(encrypted_dir):
             top_module = module_name.split(".")[0]
 
             # filter standard library — skip top-level modules, keep submodules (e.g. xml.dom)
-            if module_name in stdlib_modules:
-                if "." not in module_name:
+            if top_module in stdlib_modules:
+                if module_name == top_module:
                     # top-level stdlib module (e.g. os, sys), skip
                     continue
-                # stdlib submodule (e.g. xml.dom) — add full name for PyInstaller hidden import
+                # stdlib submodule (e.g. xml.dom, collections.abc) — add full name
                 all_third_party.add(module_name)
                 continue
             # filter __future__
@@ -474,21 +474,10 @@ def start_pyinstaller_pack(
     # causes "Module use of pythonXXX.dll conflicts with this version of Python".
     cmd = [sys.executable, "-m", "PyInstaller", "--onedir", "--name", dist_name]
 
-    # PyInstaller SOURCE:DEST separator differs per platform:
-    # ';' on Windows, ':' on Linux/macOS (os.pathsep matches this exactly)
-    sep = os.pathsep
-
-    # add all .pyd files as binaries
-    for pyd_path in pyd_files:
-        rel_dir = os.path.relpath(os.path.dirname(pyd_path), encrypted_dir)
-        cmd.append("--add-binary")
-        cmd.append(f"{pyd_path}{sep}{rel_dir}")
-
-    # add all __init__.py files as data
-    for init_path in init_files:
-        rel_dir = os.path.relpath(os.path.dirname(init_path), encrypted_dir)
-        cmd.append("--add-data")
-        cmd.append(f"{init_path}{sep}{rel_dir}")
+    # Note: --add-binary for .pyd/.so files and --add-data for __init__.py files are
+    # intentionally omitted. PyInstaller's modulegraph analysis automatically discovers
+    # these files through the main entry's import chain. Adding them explicitly bloats
+    # the command line beyond Windows' 8191-character limit (gitee.com issue #1).
 
     # add hidden imports
     for hi in hidden_imports:
