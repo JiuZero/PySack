@@ -216,7 +216,7 @@ def start_encrypt(
         nuitka_build_dir = os.path.join(dir_name, os.path.splitext(os.path.basename(item))[0] + ".build")
         if os.path.exists(nuitka_build_dir):
             try:
-                shutil.rmtree(nuitka_build_dir, onexc=lambda fn, p, e: None)
+                shutil.rmtree(nuitka_build_dir, onerror=lambda fn, p, e: None)
             except Exception:
                 pass
 
@@ -317,9 +317,26 @@ def auto_detect_dependencies(encrypted_dir):
             if top_module == "__future__":
                 continue
             # filter project internal modules
-            if top_module in internal_modules or module_name in internal_modules:
+            # Top-level internal modules (e.g. "conf", "core") are discovered by
+            # PyInstaller's modulegraph. Submodules of internal packages (e.g.
+            # "conf.i18n") may NOT be discovered because the importing module is
+            # compiled to .pyd/.so, so we add them with their full dotted name.
+            if module_name in internal_modules:
+                if "." not in module_name:
+                    continue  # top-level internal module, skip
+                # internal submodule (e.g. conf.i18n) — add full name
+                all_third_party.add(module_name)
                 continue
-            if top_module in internal_packages or module_name in internal_packages:
+            if top_module in internal_modules and "." not in module_name:
+                continue  # top-level import of internal module, skip
+            if module_name in internal_packages:
+                continue  # exact internal package (e.g. "import conf"), skip
+            if top_module in internal_packages:
+                # importing from internal package (e.g. "from conf.i18n import t")
+                if module_name == top_module:
+                    continue  # top-level internal package import, skip
+                # submodule of internal package (e.g. "conf.i18n") — add full name
+                all_third_party.add(module_name)
                 continue
             # filter names starting with _ (usually internal modules)
             if top_module.startswith("_"):
@@ -358,8 +375,15 @@ def auto_detect_dependencies(encrypted_dir):
                         logger.info(f"{C.CYAN}Added transitive dependency ({pkg} -> {dep}){C.RESET}")
 
     # verify modules exist, filter out non-existent modules (avoid false positives from .pyi path simplification)
+    # Note: internal submodules (e.g. conf.i18n, core.executor) are project-internal and won't
+    # be found by find_spec() from the pysack environment, so we keep them unconditionally.
     verified_hidden = []
     for mod in sorted(all_third_party):
+        # internal submodule — keep it, PyInstaller needs it even if find_spec fails
+        top = mod.split(".")[0]
+        if "." in mod and (top in internal_packages or top in internal_modules):
+            verified_hidden.append(mod)
+            continue
         try:
             spec = importlib.util.find_spec(mod)
         except (ModuleNotFoundError, ImportError):
@@ -462,7 +486,7 @@ def start_pyinstaller_pack(
     for d in ["dist", "build"]:
         p = os.path.join(encrypted_dir, d)
         if os.path.exists(p):
-            shutil.rmtree(p, onexc=lambda fn, p, e: None)
+            shutil.rmtree(p, onerror=lambda fn, p, e: None)
 
     spec_file = os.path.join(encrypted_dir, f"{dist_name}.spec")
     if os.path.exists(spec_file):
