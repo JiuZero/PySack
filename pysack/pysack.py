@@ -468,17 +468,21 @@ def start_pyinstaller_pack(
     # causes "Module use of pythonXXX.dll conflicts with this version of Python".
     cmd = [sys.executable, "-m", "PyInstaller", "--onedir", "--name", dist_name]
 
+    # PyInstaller SOURCE:DEST separator differs per platform:
+    # ';' on Windows, ':' on Linux/macOS (os.pathsep matches this exactly)
+    sep = os.pathsep
+
     # add all .pyd files as binaries
     for pyd_path in pyd_files:
         rel_dir = os.path.relpath(os.path.dirname(pyd_path), encrypted_dir)
         cmd.append("--add-binary")
-        cmd.append(f"{pyd_path};{rel_dir}")
+        cmd.append(f"{pyd_path}{sep}{rel_dir}")
 
     # add all __init__.py files as data
     for init_path in init_files:
         rel_dir = os.path.relpath(os.path.dirname(init_path), encrypted_dir)
         cmd.append("--add-data")
-        cmd.append(f"{init_path};{rel_dir}")
+        cmd.append(f"{init_path}{sep}{rel_dir}")
 
     # add hidden imports
     for hi in hidden_imports:
