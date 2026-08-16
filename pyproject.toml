@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pysack"
-version = "0.2.6"
+version = "0.2.7"
 license = "MIT"
 description = "Encrypt Python projects with Nuitka and pack with PyInstaller — one-command source code protection for your Python applications."
 authors = ["jiuzero <1703417187@qq.com>"]
