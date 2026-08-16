@@ -25,8 +25,8 @@ setup(
     packages=find_packages(include=["pysack", "pysack.*"]),
     python_requires=">=3.8,<4",
     install_requires=[
-        "nuitka>=2.0.0,<3.0.0",
-        "pyinstaller>=6.0.0,<7.0.0",
+        "nuitka",
+        "pyinstaller",
     ],
     entry_points={
         "console_scripts": [
