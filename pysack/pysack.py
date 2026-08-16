@@ -7,7 +7,7 @@ import ast
 import importlib.util
 from typing import Union, List
 
-from pysack.log import logger
+from pysack.log import logger, C
 
 
 def search(content, regexs):
@@ -123,7 +123,7 @@ def encrypt_py(py_files: list):
                 )
 
             encrypted_py.append(py_file)
-            logger.info("Encryption successful: {}".format(file_name))
+            logger.info(f"{C.GREEN}  Encryption successful: {file_name}{C.RESET}")
 
         except Exception as e:
             logger.exception("Encryption failed: {}, error {}".format(py_file, e))
@@ -220,7 +220,7 @@ def start_encrypt(
             except Exception:
                 pass
 
-    logger.info("Encryption completed: total={}, success={}, output: {}".format(len(need_encrypted_py), len(encrypted_py), output_file_path))
+    logger.info(f"{C.CYAN}Encryption completed: total={len(need_encrypted_py)}, success={len(encrypted_py)}, output: {output_file_path}{C.RESET}")
 
     return output_file_path
 
@@ -286,7 +286,7 @@ def auto_detect_dependencies(encrypted_dir):
             if f.endswith(".pyi"):
                 pyi_files.append(os.path.join(root, f))
 
-    logger.info(f"Extracting dependency info from {len(pyi_files)} .pyi files")
+    logger.info(f"{C.CYAN}Extracting dependency info from {len(pyi_files)} .pyi files{C.RESET}")
 
     for pyi_file in pyi_files:
         try:
@@ -344,19 +344,25 @@ def auto_detect_dependencies(encrypted_dir):
         if pkg in all_third_party:
             for dep in deps:
                 if dep not in all_third_party and dep not in stdlib_modules:
-                    spec = importlib.util.find_spec(dep)
+                    try:
+                        spec = importlib.util.find_spec(dep)
+                    except (ModuleNotFoundError, ImportError):
+                        spec = None
                     if spec is not None:
                         all_third_party.add(dep)
-                        logger.info(f"Added transitive dependency ({pkg} -> {dep})")
+                        logger.info(f"{C.CYAN}Added transitive dependency ({pkg} -> {dep}){C.RESET}")
 
     # verify modules exist, filter out non-existent modules (avoid false positives from .pyi path simplification)
     verified_hidden = []
     for mod in sorted(all_third_party):
-        spec = importlib.util.find_spec(mod)
+        try:
+            spec = importlib.util.find_spec(mod)
+        except (ModuleNotFoundError, ImportError):
+            spec = None
         if spec is not None:
             verified_hidden.append(mod)
         else:
-            logger.info(f"Module {mod} not found, skipped")
+            logger.info(f"{C.CYAN}Module {mod} not found, skipped{C.RESET}")
 
     # classify: packages needing collect_submodules vs. those needing only hidden_import
     # Note: for COLLECT_PACKAGES, both --hidden-import and --collect-submodules are needed
@@ -368,8 +374,8 @@ def auto_detect_dependencies(encrypted_dir):
             collect.append(mod)
         hidden.append(mod)  # all modules need --hidden-import
 
-    logger.info(f"Auto-detected {len(hidden)} hidden-import modules: {hidden}")
-    logger.info(f"Auto-detected {len(collect)} collect-submodules packages: {collect}")
+    logger.info(f"{C.YELLOW}Auto-detected {len(hidden)} hidden-import modules: {hidden}{C.RESET}")
+    logger.info(f"{C.YELLOW}Auto-detected {len(collect)} collect-submodules packages: {collect}{C.RESET}")
 
     return hidden, collect
 
@@ -404,6 +410,8 @@ def start_pyinstaller_pack(
 
     if dist_name is None:
         dist_name = os.path.basename(encrypted_dir)
+    else:
+        dist_name = os.path.basename(dist_name.strip("/\\"))
 
     # auto-detect dependencies (if not explicitly provided by user)
     if hidden_imports is None or collect_submodules is None:
@@ -428,7 +436,7 @@ def start_pyinstaller_pack(
             if f.endswith(".pyd"):
                 pyd_files.append(os.path.join(root, f))
 
-    logger.info(f"Found {len(pyd_files)} .pyd files")
+    logger.info(f"{C.CYAN}Found {len(pyd_files)} .pyd files{C.RESET}")
 
     # find all __init__.py files
     init_files = []
@@ -442,7 +450,7 @@ def start_pyinstaller_pack(
             if f == "__init__.py":
                 init_files.append(os.path.join(root, f))
 
-    logger.info(f"Found {len(init_files)} __init__.py files")
+    logger.info(f"{C.CYAN}Found {len(init_files)} __init__.py files{C.RESET}")
 
     # clean up old build artifacts
     for d in ["dist", "build"]:
@@ -455,7 +463,10 @@ def start_pyinstaller_pack(
         os.remove(spec_file)
 
     # Build PyInstaller command
-    cmd = ["pyinstaller", "--onedir", "--name", dist_name]
+    # Use sys.executable to ensure PyInstaller runs on the SAME Python as Nuitka.
+    # Mixing interpreters (e.g. .pyd built with 3.11, pyinstaller from 3.14 in PATH)
+    # causes "Module use of pythonXXX.dll conflicts with this version of Python".
+    cmd = [sys.executable, "-m", "PyInstaller", "--onedir", "--name", dist_name]
 
     # add all .pyd files as binaries
     for pyd_path in pyd_files:
@@ -490,7 +501,7 @@ def start_pyinstaller_pack(
         if result.returncode != 0:
             error_msg = result.stderr[-2000:] if result.stderr else result.stdout[-2000:]
             raise Exception(f"PyInstaller packaging failed:\n{error_msg}")
-        logger.info("PyInstaller packaging succeeded, output: %s", os.path.join(encrypted_dir, "dist", dist_name))
+        logger.info(f"{C.GREEN}PyInstaller packaging succeeded, output: {os.path.join(encrypted_dir, 'dist', dist_name)}{C.RESET}")
     finally:
         os.chdir(original_cwd)
 
@@ -526,9 +537,9 @@ def start_full_workflow(
         dist_dir: PyInstaller output directory
     """
     # Step 1: Nuitka Encryption
-    logger.info("=" * 60)
-    logger.info("Step 1: Nuitka Encryption")
-    logger.info("=" * 60)
+    logger.info(f"{C.GRAY}{'=' * 60}{C.RESET}")
+    logger.info(f"{C.CYAN}Step 1: Nuitka Encryption{C.RESET}")
+    logger.info(f"{C.GRAY}{'=' * 60}{C.RESET}")
     encrypted_dir = start_encrypt(
         input_file_path=input_file_path,
         output_file_path=output_file_path,
@@ -552,9 +563,9 @@ def start_full_workflow(
         return encrypted_dir
 
     # Step 2: PyInstaller Packaging
-    logger.info("=" * 60)
-    logger.info("Step 2: PyInstaller Packaging")
-    logger.info("=" * 60)
+    logger.info(f"{C.GRAY}{'=' * 60}{C.RESET}")
+    logger.info(f"{C.CYAN}Step 2: PyInstaller Packaging{C.RESET}")
+    logger.info(f"{C.GRAY}{'=' * 60}{C.RESET}")
     dist_dir = start_pyinstaller_pack(
         encrypted_dir=encrypted_dir,
         main_entry=main_entry,
@@ -563,10 +574,10 @@ def start_full_workflow(
         dist_name=dist_name,
     )
 
-    logger.info("=" * 60)
-    logger.info("Full workflow completed!")
-    logger.info("Encrypted output: %s", encrypted_dir)
-    logger.info("Packaged output: %s", dist_dir)
-    logger.info("=" * 60)
+    logger.info(f"{C.GRAY}{'=' * 60}{C.RESET}")
+    logger.info(f"{C.ORANGE}Full workflow completed!{C.RESET}")
+    logger.info(f"{C.CYAN}Encrypted output: {encrypted_dir}{C.RESET}")
+    logger.info(f"{C.CYAN}Packaged output: {dist_dir}{C.RESET}")
+    logger.info(f"{C.GRAY}{'=' * 60}{C.RESET}")
 
     return dist_dir

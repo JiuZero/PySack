@@ -13,7 +13,7 @@ Encrypt Python projects with **Nuitka** and package with **PyInstaller** — one
 ## Installation
 
 ```bash
-pip install pysack
+pip install --index-url https://test.pypi.org/simple/ pysack
 ```
 
 ## Usage

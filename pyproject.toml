@@ -1,12 +1,26 @@
 [tool.poetry]
 name = "pysack"
-version = "0.2.0"
+version = "0.2.6"
 license = "MIT"
 description = "Encrypt Python projects with Nuitka and pack with PyInstaller — one-command source code protection for your Python applications."
 authors = ["jiuzero <1703417187@qq.com>"]
 readme = "README.md"
 homepage = "https://github.com/JiuZero/PySack"
 repository = "https://github.com/JiuZero/PySack"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Security :: Cryptography",
+]
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4"
