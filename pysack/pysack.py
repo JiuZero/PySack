@@ -424,7 +424,8 @@ def start_pyinstaller_pack(
     hidden_imports = hidden_imports or []
     collect_submodules = collect_submodules or []
 
-    # find all .pyd files (excluding dist/build directories)
+    # find all compiled module files (.pyd on Windows, .so on Linux/macOS),
+    # excluding dist/build directories
     pyd_files = []
     for root, dirs, files in os.walk(encrypted_dir):
         rel = os.path.relpath(root, encrypted_dir)
@@ -433,10 +434,10 @@ def start_pyinstaller_pack(
         elif rel.startswith("dist") or rel.startswith("build") or rel.startswith("."):
             continue
         for f in files:
-            if f.endswith(".pyd"):
+            if f.endswith(".pyd") or f.endswith(".so"):
                 pyd_files.append(os.path.join(root, f))
 
-    logger.info(f"{C.CYAN}Found {len(pyd_files)} .pyd files{C.RESET}")
+    logger.info(f"{C.CYAN}Found {len(pyd_files)} .pyd/.so files{C.RESET}")
 
     # find all __init__.py files
     init_files = []

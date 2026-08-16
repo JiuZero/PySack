@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="pysack",
-    version="0.2.10",
+    version="0.2.11",
     license="MIT",
     description=(
         "Encrypt Python projects with Nuitka and pack with PyInstaller "
