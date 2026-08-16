@@ -305,8 +305,13 @@ def auto_detect_dependencies(encrypted_dir):
             # get top-level package name (e.g. typing_extensions.TypeAlias -> typing_extensions)
             top_module = module_name.split(".")[0]
 
-            # filter standard library
-            if top_module in stdlib_modules:
+            # filter standard library — skip top-level modules, keep submodules (e.g. xml.dom)
+            if module_name in stdlib_modules:
+                if "." not in module_name:
+                    # top-level stdlib module (e.g. os, sys), skip
+                    continue
+                # stdlib submodule (e.g. xml.dom) — add full name for PyInstaller hidden import
+                all_third_party.add(module_name)
                 continue
             # filter __future__
             if top_module == "__future__":
