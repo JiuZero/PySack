@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Project specific
+.pysack.cfg
+pypi_key
+
+# OS
+.DS_Store
+Thumbs.db
