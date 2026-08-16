@@ -264,16 +264,6 @@ def auto_detect_dependencies(encrypted_dir):
                 pkg_name = rel.replace(os.sep, ".")
                 internal_packages.add(pkg_name)
 
-    # common large packages that need --collect-submodules instead of just --hidden-import
-    COLLECT_PACKAGES = {
-        "fastapi", "uvicorn", "numpy", "sqlalchemy", "cryptography",
-        "httpx", "jinja2", "networkx", "rich",
-        "matplotlib", "PIL", "Pillow", "pydantic", "aiohttp",
-        "websockets", "watchfiles", "multidict", "yarl",
-        "frozenlist", "aiosignal", "lxml", "boto3", "botocore",
-        "grpc", "google", "sentence_transformers",
-    }
-
     all_third_party = set()
     pyi_files = []
     for root, dirs, files in os.walk(encrypted_dir):
@@ -342,7 +332,7 @@ def auto_detect_dependencies(encrypted_dir):
             if top_module.startswith("_"):
                 continue
 
-            all_third_party.add(top_module)
+            all_third_party.add(module_name)
 
     # Known transitive dependency mapping: when a package is detected, automatically supplement
     # its commonly used transitive dependencies. These dependencies are not captured by .pyi files
@@ -393,18 +383,13 @@ def auto_detect_dependencies(encrypted_dir):
         else:
             logger.info(f"{C.CYAN}Module {mod} not found, skipped{C.RESET}")
 
-    # classify: packages needing collect_submodules vs. those needing only hidden_import
-    # Note: for COLLECT_PACKAGES, both --hidden-import and --collect-submodules are needed
-    # because --collect-submodules only works on packages already in the import graph
-    hidden = []
+    # All modules are added as precise --hidden-import (no --collect-submodules).
+    # Using individual submodule paths (e.g. "sqlalchemy.orm" instead of "sqlalchemy")
+    # avoids importing entire packages wholesale, keeping the build lean.
+    hidden = verified_hidden
     collect = []
-    for mod in verified_hidden:
-        if mod in COLLECT_PACKAGES:
-            collect.append(mod)
-        hidden.append(mod)  # all modules need --hidden-import
 
     logger.info(f"{C.YELLOW}Auto-detected {len(hidden)} hidden-import modules: {hidden}{C.RESET}")
-    logger.info(f"{C.YELLOW}Auto-detected {len(collect)} collect-submodules packages: {collect}{C.RESET}")
 
     return hidden, collect
 
@@ -507,7 +492,8 @@ def start_pyinstaller_pack(
     for hi in hidden_imports:
         cmd.append(f"--hidden-import={hi}")
 
-    # add collect submodules
+    # add collect submodules (only when manually specified via CLI/config;
+    # auto-detection uses precise --hidden-import with submodule paths instead)
     for pkg in collect_submodules:
         cmd.append(f"--collect-submodules={pkg}")
 
