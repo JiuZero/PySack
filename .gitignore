@@ -8,6 +8,8 @@ build/
 .venv/
 venv/
 
+docs/
+
 # IDE
 .idea/
 *.iml

@@ -307,24 +307,19 @@ def auto_detect_dependencies(encrypted_dir):
             if top_module == "__future__":
                 continue
             # filter project internal modules
-            # Top-level internal modules (e.g. "conf", "core") are discovered by
-            # PyInstaller's modulegraph. Submodules of internal packages (e.g.
-            # "conf.i18n") may NOT be discovered because the importing module is
-            # compiled to .pyd/.so, so we add them with their full dotted name.
+            # Internal modules (e.g. "agent", "conf.i18n") are compiled to .pyd/.so by
+            # Nuitka, so PyInstaller's modulegraph cannot walk their imports (binary files
+            # reveal nothing about their dependencies). Add ALL of them explicitly as
+            # hidden-imports — both top-level modules and package submodules.
             if module_name in internal_modules:
-                if "." not in module_name:
-                    continue  # top-level internal module, skip
-                # internal submodule (e.g. conf.i18n) — add full name
                 all_third_party.add(module_name)
                 continue
-            if top_module in internal_modules and "." not in module_name:
-                continue  # top-level import of internal module, skip
-            if module_name in internal_packages:
-                continue  # exact internal package (e.g. "import conf"), skip
             if top_module in internal_packages:
-                # importing from internal package (e.g. "from conf.i18n import t")
+                # importing from an internal package dir (e.g. "from conf.i18n import t")
                 if module_name == top_module:
-                    continue  # top-level internal package import, skip
+                    # top-level internal package import (e.g. "import conf"), skip —
+                    # its __init__.py stays as plain text and is auto-discovered
+                    continue
                 # submodule of internal package (e.g. "conf.i18n") — add full name
                 all_third_party.add(module_name)
                 continue
@@ -365,13 +360,14 @@ def auto_detect_dependencies(encrypted_dir):
                         logger.info(f"{C.CYAN}Added transitive dependency ({pkg} -> {dep}){C.RESET}")
 
     # verify modules exist, filter out non-existent modules (avoid false positives from .pyi path simplification)
-    # Note: internal submodules (e.g. conf.i18n, core.executor) are project-internal and won't
+    # Note: internal modules (e.g. agent, conf.i18n, core.executor) are project-internal and won't
     # be found by find_spec() from the pysack environment, so we keep them unconditionally.
     verified_hidden = []
+    internal_marker = internal_packages | internal_modules
     for mod in sorted(all_third_party):
-        # internal submodule — keep it, PyInstaller needs it even if find_spec fails
+        # internal module — keep it, PyInstaller needs it even if find_spec fails
         top = mod.split(".")[0]
-        if "." in mod and (top in internal_packages or top in internal_modules):
+        if mod in internal_modules or top in internal_marker:
             verified_hidden.append(mod)
             continue
         try:
@@ -409,7 +405,7 @@ def start_pyinstaller_pack(
         main_entry: main entry file (relative to encrypted_dir, e.g. "main.py")
         hidden_imports: list of third-party modules for --hidden-import
         collect_submodules: list of packages for --collect-submodules
-        dist_name: output directory name (defaults to project name)
+        dist_name: output directory name (defaults to main entry basename)
 
     Returns:
         dist_dir: PyInstaller output directory
@@ -423,7 +419,8 @@ def start_pyinstaller_pack(
         raise ValueError(f"main_entry not found: {main_entry_path}")
 
     if dist_name is None:
-        dist_name = os.path.basename(encrypted_dir)
+        # default to the main entry filename (e.g. "main.py" -> "main")
+        dist_name = os.path.splitext(os.path.basename(main_entry))[0]
     else:
         dist_name = os.path.basename(dist_name.strip("/\\"))
 
